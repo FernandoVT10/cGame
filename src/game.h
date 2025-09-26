@@ -8,9 +8,10 @@ typedef struct {
     Vector2 pos;
     Vector2 vel;
 
+    bool isOnFloor;
     bool jumping;
     float jumpTime;
-    bool canJump;
+    bool wallJumping;
 
     bool isDashing;
     float dashTime;
@@ -38,6 +39,7 @@ typedef struct {
     Colliders colliders;
     Platforms platforms;
     Player player;
+    Camera2D camera;
 } Game;
 
 #endif // GAME_H

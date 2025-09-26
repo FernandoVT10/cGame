@@ -2,12 +2,15 @@
 
 #define PLAYER_GRAVITY 2000 // the force in which the player is pulled down
 #define PLAYER_MAX_FALL_SPEED 1000 // max vertical speed caused by gravity
-#define PLAYER_FALL_SPEED_WHEN_HUGGING_WALL 300
+#define PLAYER_FALL_SPEED_WHEN_HUGGING_WALL 200
 #define PLAYER_JUMP_DURATION 0.15 // for how long the player can press the jump button
 #define PLAYER_JUMP_FORCE 8000 // the force of the jump
 #define PLAYER_HORIZONTAL_SPEED 1000 // movement speed
 #define PLAYER_DASH_SPEED 5000 // the speed of the dash
 #define PLAYER_DASH_DURATION 0.1 // duration of the dash
+
+#define PLAYER_WIDTH 60
+#define PLAYER_HEIGHT 120
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -17,30 +20,40 @@ static void handle_jump(Player *player) {
 
     bool keyPressed = IsKeyDown(KEY_Z);
 
-    if(player->huggingWall && keyPressed) {
-        player->vel.x = -20000;
-        return;
-    }
+    if(!player->jumping && keyPressed) {
+        if(player->huggingWall) {
+            player->wallJumping = true;
+            player->jumping = true;
+            player->jumpTime = 0;
 
-    if(keyPressed && player->canJump) {
-        player->jumping = true;
-        player->canJump = false;
+            player->vel.x = -1000;
+            player->vel.y = -500;
+        } else if(player->isOnFloor) {
+            player->jumping = true;
+            player->jumpTime = 0;
+        }
     }
 
     if(player->jumping && keyPressed) {
         player->jumpTime += dt;
-        player->vel.y -= PLAYER_JUMP_FORCE * dt;
+        if(player->wallJumping) {
+            player->vel.y -= PLAYER_JUMP_FORCE / 2 * dt;
+        } else {
+            player->vel.y -= PLAYER_JUMP_FORCE * dt;
+        }
 
         if(player->jumpTime > PLAYER_JUMP_DURATION) {
             player->jumping = false;
+            player->wallJumping = false;
         }
     } else if(player->jumping) {
         player->jumping = false;
+        player->wallJumping = false;
     }
 }
 
 static void handle_horizontal_movement(Player *player) {
-    if(player->isDashing) return;
+    if(player->isDashing || player->wallJumping) return;
 
     if(IsKeyDown(KEY_RIGHT)) {
         player->vel.x = PLAYER_HORIZONTAL_SPEED;
@@ -52,6 +65,8 @@ static void handle_horizontal_movement(Player *player) {
 }
 
 static void handle_dash(Player *player) {
+    if(player->huggingWall) return;
+
     float dt = GetFrameTime();
 
     if(IsKeyPressed(KEY_C)) {
@@ -77,8 +92,8 @@ Collider *check_collision(Game *game) {
     Rectangle playerRec = {
         .x = game->player.pos.x,
         .y = game->player.pos.y,
-        .width = 40,
-        .height = 80,
+        .width = PLAYER_WIDTH,
+        .height = PLAYER_HEIGHT,
     };
 
     for(size_t i = 0; i < game->colliders.count; i++) {
@@ -100,11 +115,13 @@ static void handle_horizontal_collision(Game *game) {
     if(collider != NULL) {
         Rectangle colliderRec = collider->rec;
 
-        player->huggingWall = true;
+        if(!player->jumping && !player->isOnFloor) {
+            player->huggingWall = true;
+        }
 
         if(player->vel.x > 0) {
             player->vel.x = 0;
-            player->pos.x = colliderRec.x - 40;
+            player->pos.x = colliderRec.x - PLAYER_WIDTH;
         } else {
             player->vel.x = 0;
             player->pos.x = colliderRec.x + colliderRec.width;
@@ -115,7 +132,6 @@ static void handle_horizontal_collision(Game *game) {
 }
 
 void player_update(Game *game) {
-    static int playerHeight = 80;
     float dt = GetFrameTime();
 
     Player *player = &game->player;
@@ -131,19 +147,21 @@ void player_update(Game *game) {
 
     player->pos.y += player->vel.y * dt;
     Collider *collider = check_collision(game);
+    player->isOnFloor = false;
+
     if(collider != NULL) {
         Rectangle colliderRec = collider->rec;
 
         if(player->vel.y > 0) {
             player->vel.y = 0;
-            player->pos.y = colliderRec.y - 80;
-            player->canJump = true;
-            player->jumpTime = 0;
+            player->pos.y = colliderRec.y - PLAYER_HEIGHT;
+            player->isOnFloor = true;
         } else {
             player->vel.y = 0;
             player->pos.y = colliderRec.y + colliderRec.height;
+            player->jumping = false;
         }
     }
 
-    DrawRectangle(player->pos.x, player->pos.y, 40, playerHeight, RED);
+    DrawRectangle(player->pos.x, player->pos.y, PLAYER_WIDTH, PLAYER_HEIGHT, RED);
 }
