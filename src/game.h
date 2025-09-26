@@ -14,6 +14,8 @@ typedef struct {
 
     bool isDashing;
     float dashTime;
+
+    bool huggingWall;
 } Player;
 
 typedef struct {

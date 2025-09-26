@@ -1,6 +1,8 @@
 #include "player.h"
 
 #define PLAYER_GRAVITY 2000 // the force in which the player is pulled down
+#define PLAYER_MAX_FALL_SPEED 1000 // max vertical speed caused by gravity
+#define PLAYER_FALL_SPEED_WHEN_HUGGING_WALL 300
 #define PLAYER_JUMP_DURATION 0.15 // for how long the player can press the jump button
 #define PLAYER_JUMP_FORCE 8000 // the force of the jump
 #define PLAYER_HORIZONTAL_SPEED 1000 // movement speed
@@ -13,15 +15,27 @@
 static void handle_jump(Player *player) {
     float dt = GetFrameTime();
 
-    if(IsKeyDown(KEY_Z) && player->canJump) {
+    bool keyPressed = IsKeyDown(KEY_Z);
+
+    if(player->huggingWall && keyPressed) {
+        player->vel.x = -20000;
+        return;
+    }
+
+    if(keyPressed && player->canJump) {
+        player->jumping = true;
+        player->canJump = false;
+    }
+
+    if(player->jumping && keyPressed) {
         player->jumpTime += dt;
         player->vel.y -= PLAYER_JUMP_FORCE * dt;
 
         if(player->jumpTime > PLAYER_JUMP_DURATION) {
-            player->canJump = false;
+            player->jumping = false;
         }
-    } else if(!IsKeyDown(KEY_Z) && player->canJump) {
-        player->canJump = false;
+    } else if(player->jumping) {
+        player->jumping = false;
     }
 }
 
@@ -77,6 +91,29 @@ Collider *check_collision(Game *game) {
     return NULL;
 }
 
+static void handle_horizontal_collision(Game *game) {
+    float dt = GetFrameTime();
+    Player *player = &game->player;
+    player->pos.x += player->vel.x * dt;
+
+    Collider *collider = check_collision(game);
+    if(collider != NULL) {
+        Rectangle colliderRec = collider->rec;
+
+        player->huggingWall = true;
+
+        if(player->vel.x > 0) {
+            player->vel.x = 0;
+            player->pos.x = colliderRec.x - 40;
+        } else {
+            player->vel.x = 0;
+            player->pos.x = colliderRec.x + colliderRec.width;
+        }
+    } else if(player->huggingWall) {
+        player->huggingWall = false;
+    }
+}
+
 void player_update(Game *game) {
     static int playerHeight = 80;
     float dt = GetFrameTime();
@@ -87,25 +124,13 @@ void player_update(Game *game) {
     handle_horizontal_movement(player);
     handle_dash(player);
 
-    player->vel.y += PLAYER_GRAVITY * dt;
+    float max = player->huggingWall ? PLAYER_FALL_SPEED_WHEN_HUGGING_WALL : PLAYER_MAX_FALL_SPEED;
+    player->vel.y = MIN(max, player->vel.y + PLAYER_GRAVITY * dt);
 
-    player->pos.x += player->vel.x * dt;
-
-    Collider *collider = check_collision(game);
-    if(collider != NULL) {
-        Rectangle colliderRec = collider->rec;
-
-        if(player->vel.x > 0) {
-            player->vel.x = 0;
-            player->pos.x = colliderRec.x - 40;
-        } else {
-            player->vel.x = 0;
-            player->pos.x = colliderRec.x + colliderRec.width;
-        }
-    }
+    handle_horizontal_collision(game);
 
     player->pos.y += player->vel.y * dt;
-    collider = check_collision(game);
+    Collider *collider = check_collision(game);
     if(collider != NULL) {
         Rectangle colliderRec = collider->rec;
 
