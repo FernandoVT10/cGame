@@ -49,6 +49,7 @@ static void handle_dash(Player *player) {
 
     if(player->isDashing) {
         player->dashTime += dt;
+        player->vel.y = 0;
 
         if(player->dashTime > PLAYER_DASH_DURATION) {
             player->isDashing = false;
