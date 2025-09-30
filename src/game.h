@@ -4,19 +4,24 @@
 #include <stddef.h>
 #include "raylib.h"
 
+#define PLAYER_DIR_LEFT -1
+#define PLAYER_DIR_RIGHT 1
+
 typedef struct {
     Vector2 pos;
     Vector2 vel;
 
     bool isOnFloor;
+
     bool jumping;
     float jumpTime;
-    bool wallJumping;
 
-    bool isDashing;
+    bool dashing;
     float dashTime;
 
     bool huggingWall;
+
+    int dir; // 1 for right, -1 for left, default 1
 } Player;
 
 typedef struct {

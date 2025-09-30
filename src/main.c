@@ -18,6 +18,9 @@ int main(void) {
         .camera = {
             .zoom = 1,
         },
+        .player = {
+            .dir = 1,
+        },
     };
 
     da_append(&game.platforms, ((Rectangle){
@@ -47,6 +50,13 @@ int main(void) {
         .y = 200,
         .width = 200,
         .height = 80,
+    }));
+
+    da_append(&game.platforms, ((Rectangle){
+        .x = 600,
+        .y = 500,
+        .width = 10,
+        .height = 220,
     }));
 
     for(size_t i = 0; i < game.platforms.count; i++) {
