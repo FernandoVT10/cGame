@@ -4,6 +4,19 @@
 #include <stddef.h>
 #include "raylib.h"
 
+typedef struct {
+    float x;
+    float y;
+    float width;
+    float height;
+} Collider;
+
+typedef struct {
+    Collider *items;
+    size_t count;
+    size_t capacity;
+} Colliders;
+
 #define PLAYER_DIR_LEFT -1
 #define PLAYER_DIR_RIGHT 1
 
@@ -23,16 +36,6 @@ typedef struct {
 
     int dir; // 1 for right, -1 for left, default 1
 } Player;
-
-typedef struct {
-    Rectangle rec;
-} Collider;
-
-typedef struct {
-    Collider *items;
-    size_t count;
-    size_t capacity;
-} Colliders;
 
 typedef struct {
     Rectangle *items;

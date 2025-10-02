@@ -6,7 +6,7 @@
 void platforms_draw(Platforms platforms) {
     for(size_t i = 0; i < platforms.count; i++) {
         Rectangle platform = platforms.items[i];
-        DrawRectangleRec(platform, BLUE);
+        DrawRectangleLinesEx(platform, 1, BLUE);
     }
 }
 
@@ -60,8 +60,12 @@ int main(void) {
     }));
 
     for(size_t i = 0; i < game.platforms.count; i++) {
+        Rectangle p = game.platforms.items[i];
         da_append(&game.colliders, ((Collider){
-            .rec = game.platforms.items[i],
+            .x = p.x,
+            .y = p.y,
+            .width = p.width,
+            .height = p.height,
         }));
     }
 

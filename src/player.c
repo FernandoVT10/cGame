@@ -93,110 +93,158 @@ static void jump(Player *player) {
     }
 }
 
-Collider *check_collision(Game *game) {
-    Rectangle playerRec = {
-        .x = game->player.pos.x,
-        .y = game->player.pos.y,
-        .width = PLAYER_WIDTH,
-        .height = PLAYER_HEIGHT,
+static Rectangle get_rec_from_collider(Collider coll) {
+    return (Rectangle) {
+        .x = coll.x,
+        .y = coll.y,
+        .width = coll.width,
+        .height = coll.height,
     };
-
-    for(size_t i = 0; i < game->colliders.count; i++) {
-        Collider *collider = &game->colliders.items[i];
-        if(CheckCollisionRecs(playerRec, collider->rec)) {
-            return collider;
-        }
-    }
-
-    return NULL;
 }
 
-Collider *check_collision2(Game *game, Vector2 prevPos, Vector2 pos) {
-    float diff = pos.x - prevPos.x;
-
-    Rectangle playerRec = {
-        .x = diff > 0 ? prevPos.x : pos.x,
+// continous collision detection for platform-like colliders in the X axis
+static Collider *get_ccd_x_axis(Colliders colliders, Vector2 pos, Vector2 size, float vel) {
+    Rectangle rec = {
+        .x = vel > 0 ? pos.x : pos.x + vel,
         .y = pos.y,
-        .width = fabs(diff) + PLAYER_WIDTH,
-        .height = PLAYER_HEIGHT,
+        .width = fabs(vel) + size.x,
+        .height = size.y,
     };
 
-    DrawRectangleRec(playerRec, GREEN);
+    Collider *res = NULL;
 
-    for(size_t i = 0; i < game->colliders.count; i++) {
-        Collider *collider = &game->colliders.items[i];
-        if(CheckCollisionRecs(playerRec, collider->rec)) {
-            return collider;
+#if DEBUG_CCD
+    DrawRectangleLinesEx(rec, 2, GREEN);
+#endif
+
+    for(size_t i = 0; i < colliders.count; i++) {
+        Collider *coll = &colliders.items[i];
+        Rectangle collRec = get_rec_from_collider(colliders.items[i]);
+
+        if(CheckCollisionRecs(rec, collRec)) {
+            if(!res) {
+                res = coll;
+                continue;
+            }
+
+            // if the vel is too great there could be more than 1 collision
+            // we want to find the closest one to the initial position
+
+            float collDistance = fabs(coll->x - pos.x);
+            float resDistance = fabs(res->x - pos.x);
+
+            res = collDistance < resDistance ? coll : res;
         }
     }
 
-    return NULL;
+    return res;
 }
 
-static void handle_horizontal_collision(Game *game) {
+// continous collision detection for platform-like colliders in the Y axis
+static Collider *get_ccd_y_axis(Colliders colliders, Vector2 pos, Vector2 size, float vel) {
+    Rectangle rec = {
+        .x = pos.x,
+        .y = vel > 0 ? pos.y : pos.y + vel,
+        .width = size.x,
+        .height = fabs(vel) + size.y,
+    };
+
+    Collider *res = NULL;
+
+#if DEBUG_CCD
+    DrawRectangleLinesEx(rec, 2, GREEN);
+#endif
+
+    for(size_t i = 0; i < colliders.count; i++) {
+        Collider *coll = &colliders.items[i];
+        Rectangle collRec = get_rec_from_collider(colliders.items[i]);
+
+        if(CheckCollisionRecs(rec, collRec)) {
+            if(!res) {
+                res = coll;
+                continue;
+            }
+
+            // if the vel is too great there could be more than 1 collision
+            // we want to find the closest one to the initial position
+
+            float collDistance = fabs(coll->y - pos.y);
+            float resDistance = fabs(res->y - pos.y);
+
+            res = collDistance < resDistance ? coll : res;
+        }
+    }
+
+    return res;
+}
+
+static void collision_x_axis(Game *game) {
+    // TODO: remove when a collider is added to the player
+    static Vector2 playerSize = {PLAYER_WIDTH, PLAYER_HEIGHT};
+
     float dt = GetFrameTime();
     Player *player = &game->player;
 
-    Vector2 prevPos = player->pos;
+    float vel = player->vel.x * dt;
 
-    player->pos.x += player->vel.x * dt;
+    Collider *coll = get_ccd_x_axis(game->colliders, player->pos, playerSize, vel);
 
-    Collider *collider = check_collision2(game, prevPos, player->pos);
-    if(collider != NULL) {
-        Rectangle colliderRec = collider->rec;
+    player->pos.x += vel;
 
+    if(coll != NULL) {
         if(!player->jumping && !player->isOnFloor) {
             player->huggingWall = true;
         }
 
         if(player->vel.x > 0) {
             player->vel.x = 0;
-            player->pos.x = colliderRec.x - PLAYER_WIDTH;
+            player->pos.x = coll->x - PLAYER_WIDTH;
         } else if(player->vel.x < 0) {
             player->vel.x = 0;
-            player->pos.x = colliderRec.x + colliderRec.width;
+            player->pos.x = coll->x + coll->width;
         }
     } else if(player->huggingWall) {
         player->huggingWall = false;
     }
 }
 
-static void collisions(Game *game) {
-    (void) game;
+static void collision_y_axis(Game *game) {
+    // TODO: remove when a collider is added to the player
+    static Vector2 playerSize = {PLAYER_WIDTH, PLAYER_HEIGHT};
+
+    float dt = GetFrameTime();
+    Player *player = &game->player;
+
+    float vel = player->vel.y * dt;
+
+    Collider *coll = get_ccd_y_axis(game->colliders, player->pos, playerSize, vel);
+    player->pos.y += vel;
+    player->isOnFloor = false;
+
+    if(coll != NULL) {
+        if(player->vel.y > 0) {
+            player->vel.y = 0;
+            player->pos.y = coll->y - PLAYER_HEIGHT;
+            player->isOnFloor = true;
+        } else if(player->vel.y < 0) {
+            player->vel.y = 0;
+            player->pos.y = coll->y + coll->height;
+            player->jumping = false;
+        }
+    }
 }
 
 void player_update(Game *game) {
-    float dt = GetFrameTime();
-
     Player *player = &game->player;
 
     gravity(player);
     dash(player);
     movement(player);
     jump(player);
-    collisions(game);
 
-    handle_horizontal_collision(game);
+    collision_x_axis(game);
+    collision_y_axis(game);
 
-    player->pos.y += player->vel.y * dt;
-    Collider *collider = check_collision(game);
-    player->isOnFloor = false;
-
-    if(collider != NULL) {
-        Rectangle colliderRec = collider->rec;
-
-        if(player->vel.y > 0) {
-            player->vel.y = 0;
-            player->pos.y = colliderRec.y - PLAYER_HEIGHT;
-            player->isOnFloor = true;
-        } else if(player->vel.y < 0) {
-            player->vel.y = 0;
-            player->pos.y = colliderRec.y + colliderRec.height;
-            player->jumping = false;
-        }
-
-        if(colliderRec.y == 500) TraceLog(LOG_INFO, "Collision!");
-    }
-
-    DrawRectangle(player->pos.x, player->pos.y, PLAYER_WIDTH, PLAYER_HEIGHT, RED);
+    Rectangle rec = {player->pos.x, player->pos.y, PLAYER_WIDTH, PLAYER_HEIGHT};
+    DrawRectangleLinesEx(rec, 2, RED);
 }
