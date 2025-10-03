@@ -18,6 +18,8 @@
 #define PLAYER_WIDTH 60
 #define PLAYER_HEIGHT 120
 
+#define DEBUG_CCD 1
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -102,95 +104,32 @@ static Rectangle get_rec_from_collider(Collider coll) {
     };
 }
 
-// continous collision detection for platform-like colliders in the X axis
-static Collider *get_ccd_x_axis(Colliders colliders, Vector2 pos, Vector2 size, float vel) {
-    Rectangle rec = {
-        .x = vel > 0 ? pos.x : pos.x + vel,
-        .y = pos.y,
-        .width = fabs(vel) + size.x,
-        .height = size.y,
+static Collider *get_collision(Colliders colliders, Player *player) {
+    Rectangle playerRec = {
+        .x = player->pos.x,
+        .y = player->pos.y,
+        .width = PLAYER_WIDTH,
+        .height = PLAYER_HEIGHT,
     };
-
-    Collider *res = NULL;
-
-#if DEBUG_CCD
-    DrawRectangleLinesEx(rec, 2, GREEN);
-#endif
 
     for(size_t i = 0; i < colliders.count; i++) {
         Collider *coll = &colliders.items[i];
         Rectangle collRec = get_rec_from_collider(colliders.items[i]);
 
-        if(CheckCollisionRecs(rec, collRec)) {
-            if(!res) {
-                res = coll;
-                continue;
-            }
-
-            // if the vel is too great there could be more than 1 collision
-            // we want to find the closest one to the initial position
-
-            float collDistance = fabs(coll->x - pos.x);
-            float resDistance = fabs(res->x - pos.x);
-
-            res = collDistance < resDistance ? coll : res;
+        if(CheckCollisionRecs(collRec, playerRec)) {
+            return coll;
         }
     }
 
-    return res;
-}
-
-// continous collision detection for platform-like colliders in the Y axis
-static Collider *get_ccd_y_axis(Colliders colliders, Vector2 pos, Vector2 size, float vel) {
-    Rectangle rec = {
-        .x = pos.x,
-        .y = vel > 0 ? pos.y : pos.y + vel,
-        .width = size.x,
-        .height = fabs(vel) + size.y,
-    };
-
-    Collider *res = NULL;
-
-#if DEBUG_CCD
-    DrawRectangleLinesEx(rec, 2, GREEN);
-#endif
-
-    for(size_t i = 0; i < colliders.count; i++) {
-        Collider *coll = &colliders.items[i];
-        Rectangle collRec = get_rec_from_collider(colliders.items[i]);
-
-        if(CheckCollisionRecs(rec, collRec)) {
-            if(!res) {
-                res = coll;
-                continue;
-            }
-
-            // if the vel is too great there could be more than 1 collision
-            // we want to find the closest one to the initial position
-
-            float collDistance = fabs(coll->y - pos.y);
-            float resDistance = fabs(res->y - pos.y);
-
-            res = collDistance < resDistance ? coll : res;
-        }
-    }
-
-    return res;
+    return NULL;
 }
 
 static void collision_x_axis(Game *game) {
-    // TODO: remove when a collider is added to the player
-    static Vector2 playerSize = {PLAYER_WIDTH, PLAYER_HEIGHT};
-
     float dt = GetFrameTime();
     Player *player = &game->player;
+    player->pos.x += player->vel.x * dt;
 
-    float vel = player->vel.x * dt;
-
-    Collider *coll = get_ccd_x_axis(game->colliders, player->pos, playerSize, vel);
-
-    player->pos.x += vel;
-
+    Collider *coll = get_collision(game->colliders, player);
     if(coll != NULL) {
         if(!player->jumping && !player->isOnFloor) {
             player->huggingWall = true;
@@ -209,18 +148,12 @@ static void collision_x_axis(Game *game) {
 }
 
 static void collision_y_axis(Game *game) {
-    // TODO: remove when a collider is added to the player
-    static Vector2 playerSize = {PLAYER_WIDTH, PLAYER_HEIGHT};
-
     float dt = GetFrameTime();
     Player *player = &game->player;
-
-    float vel = player->vel.y * dt;
-
-    Collider *coll = get_ccd_y_axis(game->colliders, player->pos, playerSize, vel);
-    player->pos.y += vel;
+    player->pos.y += player->vel.y * dt;
     player->isOnFloor = false;
 
+    Collider *coll = get_collision(game->colliders, player);
     if(coll != NULL) {
         if(player->vel.y > 0) {
             player->vel.y = 0;
